@@ -1,0 +1,7 @@
+venv/
+logs/
+fms/
+.claude/
+.cache/
+.env
+__pycache__/
