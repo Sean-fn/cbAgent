@@ -1,133 +1,85 @@
 """
 Technical Agent - Analyzes Git repositories for component information
-Uses Codex/Claude to perform technical code analysis
+Uses Codex CLI directly (no regex parsing - passes queries directly to Codex)
 """
 
 from pathlib import Path
-from typing import Dict, Any
-from openai import AsyncOpenAI
+from typing import Optional
+from src.codex.codex_executor import CodexExecutor, CodexResponse, CodexTimeoutError, CodexAuthError
 
 
 class TechnicalAgent:
     """
-    Technical analysis agent that uses OpenAI to analyze code repositories
+    Technical analysis agent that uses Codex CLI to analyze code repositories
 
     This agent:
-    - Searches for component definitions and usage examples
-    - Identifies dependencies, imports, and related code
-    - Extracts technical details like parameters, props, methods
+    - Passes user queries directly to Codex without parsing
+    - Lets Codex handle component identification and analysis
+    - Returns raw technical analysis from Codex
     """
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano", repo_path: Path = None):
-        self.client = AsyncOpenAI(api_key=api_key)
-        self.model = model
-        self.repo_path = repo_path
-
-    async def analyze_component(
-        self,
-        component_name: str,
-        query_type: str,
-        context: str = ""
-    ) -> str:
+    def __init__(self, api_key: str = None, model: str = None, repo_path: Path = None, logs_dir: Optional[Path] = None):
         """
-        Analyze a component in the repository
+        Initialize the TechnicalAgent with Codex CLI executor
 
         Args:
-            component_name: Name of the component to analyze
-            query_type: Type of analysis (usage, restrictions, dependencies, business_rules)
-            context: Additional context or specific files to analyze
+            api_key: Deprecated - Codex CLI uses session-based auth via 'codex login'
+            model: Deprecated - Codex CLI determines model automatically
+            repo_path: Path to the repository to analyze
+            logs_dir: Directory to save raw Codex outputs (optional)
+        """
+        self.repo_path = repo_path
+        self.codex = CodexExecutor(repo_path=repo_path, timeout=600, logs_dir=logs_dir)
+
+    async def analyze_query(self, user_query: str) -> str:
+        """
+        Analyze a user query directly using Codex
+
+        Args:
+            user_query: Raw user query (e.g., "How do I use the PaymentButton?")
 
         Returns:
-            Technical analysis of the component
+            Technical analysis from Codex formatted as markdown text
         """
-        prompt = self._build_prompt(component_name, query_type, context)
+        # Build the prompt for Codex
+        prompt = self._build_codex_prompt(user_query)
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": self._get_system_prompt()
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-            )
+            # Send query to Codex and get structured response
+            response: CodexResponse = await self.codex.execute_query(prompt)
 
-            return response.choices[0].message.content
+            # Convert to formatted text for TranslatorAgent
+            return response.to_technical_output()
 
+        except CodexTimeoutError as e:
+            raise RuntimeError(f"Analysis timed out: {str(e)}")
+        except CodexAuthError as e:
+            raise RuntimeError(f"Codex authentication failed: {str(e)}. Please run 'codex login'.")
         except Exception as e:
-            raise RuntimeError(f"Technical analysis failed: {str(e)}")
+            raise RuntimeError(f"Codex analysis failed: {str(e)}")
 
-    def _get_system_prompt(self) -> str:
-        """Get the system prompt for the technical agent"""
-        return """You are a technical code analyst with expertise in analyzing codebases.
+    def _build_codex_prompt(self, user_query: str) -> str:
+        """
+        Build the prompt for Codex based on the user's query
 
-Your job:
-1. Analyze code repositories for component information
-2. Find usage examples, restrictions, dependencies, and business rules
-3. Provide comprehensive technical details including:
-   - File paths where components are defined
-   - Import statements and module structure
-   - Parameters, props, or configuration options
-   - Code examples from the repository
-   - Dependencies and related components
-   - Technical constraints and limitations
+        Args:
+            user_query: The raw user question
 
-Be thorough and precise in your analysis. Include specific file paths, line numbers when relevant, and actual code snippets."""
+        Returns:
+            Formatted prompt for Codex
+        """
+        return f"""Analyze this codebase to answer the following question:
 
-    def _build_prompt(self, component_name: str, query_type: str, context: str) -> str:
-        """Build the analysis prompt based on query type"""
-        base_prompts = {
-            "usage": f"""Analyze the {component_name} component in the repository.
+{user_query}
 
-Find and provide:
-1. Where {component_name} is defined (file paths)
-2. How it's imported and used in other files
-3. Parameters, props, or configuration it accepts
-4. Actual code examples showing usage
-5. Common usage patterns
+Provide a comprehensive technical analysis including:
+- Relevant file paths and code locations
+- Code examples and usage patterns
+- Dependencies and imports
+- Technical constraints and limitations
+- Implementation details
 
-{context}""",
-
-            "restrictions": f"""Analyze restrictions and constraints for {component_name}.
-
-Find and provide:
-1. Input validation rules (type checking, prop validation, etc.)
-2. Documented limitations in comments or documentation
-3. Error handling and edge cases
-4. What this component CANNOT do or handle
-5. Technical constraints (browser support, dependencies, etc.)
-
-{context}""",
-
-            "dependencies": f"""Analyze dependencies for {component_name}.
-
-Find and provide:
-1. All import statements in the component file
-2. External packages required (from package.json or similar)
-3. Internal dependencies (other components it uses)
-4. Required peer dependencies
-5. Optional dependencies
-
-{context}""",
-
-            "business_rules": f"""Analyze business logic and rules in {component_name}.
-
-Find and provide:
-1. Validation logic that enforces business rules
-2. Workflow steps or state transitions
-3. Business constraints in comments or code
-4. Conditional logic based on business requirements
-5. Data transformation rules
-
-{context}"""
-        }
-
-        return base_prompts.get(query_type, f"Analyze {component_name} component.\n\n{context}")
+Focus on being thorough and accurate. Include actual code snippets from the repository."""
 
 
 class MockTechnicalAgent:

@@ -16,15 +16,13 @@ class CacheEntry:
 
     def __init__(
         self,
-        component: str,
-        query_type: str,
+        query: str,
         brief_output: str,
         detailed_output: str,
         git_commit: str,
         timestamp: str,
     ):
-        self.component = component
-        self.query_type = query_type
+        self.query = query
         self.brief_output = brief_output
         self.detailed_output = detailed_output
         self.git_commit = git_commit
@@ -33,8 +31,7 @@ class CacheEntry:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON storage"""
         return {
-            "component": self.component,
-            "query_type": self.query_type,
+            "query": self.query,
             "brief_output": self.brief_output,
             "detailed_output": self.detailed_output,
             "git_commit": self.git_commit,
@@ -45,8 +42,7 @@ class CacheEntry:
     def from_dict(data: Dict[str, Any]) -> "CacheEntry":
         """Create CacheEntry from dictionary"""
         return CacheEntry(
-            component=data["component"],
-            query_type=data["query_type"],
+            query=data["query"],
             brief_output=data["brief_output"],
             detailed_output=data["detailed_output"],
             git_commit=data["git_commit"],
@@ -71,16 +67,19 @@ class CacheManager:
         """Get the current Git commit hash"""
         return self.repo.head.commit.hexsha
 
-    def get(self, component: str, query_type: str) -> Optional[CacheEntry]:
+    def get(self, query: str) -> Optional[CacheEntry]:
         """
         Retrieve cache entry if valid
+
+        Args:
+            query: The raw user query
 
         Returns None if:
         - Cache entry doesn't exist
         - Entry has expired (TTL)
         - Git commit has changed (auto-invalidation enabled)
         """
-        cache_path = self._get_cache_path(component, query_type)
+        cache_path = self._get_cache_path(query)
 
         if not cache_path.exists():
             return None
@@ -112,18 +111,16 @@ class CacheManager:
 
     def set(
         self,
-        component: str,
-        query_type: str,
+        query: str,
         brief_output: str,
         detailed_output: str,
     ) -> None:
         """Store cache entry with current Git commit"""
-        cache_path = self._get_cache_path(component, query_type)
+        cache_path = self._get_cache_path(query)
         cache_path.parent.mkdir(parents=True, exist_ok=True)
 
         entry = CacheEntry(
-            component=component,
-            query_type=query_type,
+            query=query,
             brief_output=brief_output,
             detailed_output=detailed_output,
             git_commit=self.get_current_commit(),
@@ -133,50 +130,46 @@ class CacheManager:
         with open(cache_path, "w") as f:
             json.dump(entry.to_dict(), f, indent=2)
 
-    def clear(self, component: Optional[str] = None) -> int:
+    def clear(self, query: Optional[str] = None) -> int:
         """
         Clear cache entries
 
         Args:
-            component: If specified, only clear cache for this component.
-                      If None, clear all cache.
+            query: If specified, only clear cache for this query.
+                   If None, clear all cache.
 
         Returns:
             Number of cache entries cleared
         """
         count = 0
 
-        if component is None:
+        if query is None:
             # Clear all cache
             for cache_file in self.cache_dir.rglob("*.json"):
                 cache_file.unlink()
                 count += 1
         else:
-            # Clear cache for specific component
-            component_hash = self._hash_component_name(component)
-            component_dir = self.cache_dir / component_hash
-            if component_dir.exists():
-                for cache_file in component_dir.glob("*.json"):
-                    cache_file.unlink()
-                    count += 1
+            # Clear cache for specific query
+            cache_path = self._get_cache_path(query)
+            if cache_path.exists():
+                cache_path.unlink()
+                count += 1
 
         return count
 
     def get_stats(self) -> Dict[str, int]:
         """Get cache statistics"""
         total_entries = len(list(self.cache_dir.rglob("*.json")))
-        total_components = len(list(self.cache_dir.glob("*")))
 
         return {
             "total_entries": total_entries,
-            "total_components": total_components,
         }
 
-    def _get_cache_path(self, component: str, query_type: str) -> Path:
+    def _get_cache_path(self, query: str) -> Path:
         """Get the file path for a cache entry"""
-        component_hash = self._hash_component_name(component)
-        return self.cache_dir / component_hash / f"{query_type}.json"
+        query_hash = self._hash_query(query)
+        return self.cache_dir / f"{query_hash}.json"
 
-    def _hash_component_name(self, component: str) -> str:
-        """Generate a hash for the component name"""
-        return hashlib.md5(component.encode()).hexdigest()[:8]
+    def _hash_query(self, query: str) -> str:
+        """Generate a hash for the query"""
+        return hashlib.md5(query.encode()).hexdigest()

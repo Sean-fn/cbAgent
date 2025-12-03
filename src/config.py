@@ -22,10 +22,10 @@ class Settings(BaseSettings):
     cache_auto_invalidate: bool = True
 
     # Codex configuration
-    codex_timeout: int = 300
+    codex_timeout: int = 600  # Increased to 10 minutes for complex queries
+    codex_logs_dir: Path = Path.cwd() / "codex_logs"
 
     # Agent configuration
-    technical_agent_model: str = "gpt-5-nano"
     translator_agent_model: str = "gpt-5-nano"
 
     # Logging
@@ -33,7 +33,6 @@ class Settings(BaseSettings):
     log_file: Optional[Path] = None
 
     # Session configuration
-    mcp_session_timeout: int = 360000
     max_retries: int = 3
 
     model_config = SettingsConfigDict(

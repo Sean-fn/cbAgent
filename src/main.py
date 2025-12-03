@@ -19,8 +19,6 @@ from src.config import get_config
 from src.cache import CacheManager, CacheEntry
 from src.agents.technical_agent import TechnicalAgent
 from src.agents.translator_agent import TranslatorAgent
-from src.queries.parser import QueryParser, QueryType
-from src.queries.templates import get_query_template, get_query_description
 from git import Repo
 
 
@@ -31,8 +29,7 @@ class SessionState:
     """Tracks session state for progressive disclosure"""
 
     def __init__(self):
-        self.last_component: Optional[str] = None
-        self.last_query_type: Optional[str] = None
+        self.last_query: Optional[str] = None
         self.last_detailed: Optional[str] = None
 
 
@@ -53,9 +50,10 @@ class PMQuerySystem:
         ) if self.config.cache_enabled else None
 
         self.technical_agent = TechnicalAgent(
-            api_key=self.config.openai_api_key,
-            model=self.config.technical_agent_model,
-            repo_path=self.config.repo_path
+            api_key=None,  # Codex CLI uses session auth via 'codex login'
+            model=None,    # Codex CLI determines model automatically
+            repo_path=self.config.repo_path,
+            logs_dir=self.config.codex_logs_dir
         )
 
         self.translator_agent = TranslatorAgent(
@@ -63,7 +61,6 @@ class PMQuerySystem:
             model=self.config.translator_agent_model
         )
 
-        self.query_parser = QueryParser()
         self.session_state = SessionState()
 
         # Get repository info
@@ -92,21 +89,13 @@ Commands:
         console.print(Panel(welcome_text, border_style="cyan"))
 
     async def process_query(self, user_input: str):
-        """Process a user query"""
-        # Parse the query
-        component_name, query_type = self.query_parser.parse(user_input)
-
-        if not component_name:
-            console.print("[yellow]⚠️  Could not identify a component name in your query.[/yellow]")
-            console.print("Try being more specific, e.g., 'How do I use the PaymentButton?'")
-            return
-
-        console.print(f"\n[dim]Analyzing {component_name}...[/dim]")
+        """Process a user query by sending it directly to Codex"""
+        console.print(f"\n[dim]Analyzing your query...[/dim]")
 
         # Check cache
         cached_entry: Optional[CacheEntry] = None
         if self.cache:
-            cached_entry = self.cache.get(component_name, query_type.value)
+            cached_entry = self.cache.get(user_input)
 
         if cached_entry:
             brief = cached_entry.brief_output
@@ -115,23 +104,19 @@ Commands:
         else:
             # Perform analysis
             try:
-                # Get technical analysis
-                technical_output = await self.technical_agent.analyze_component(
-                    component_name=component_name,
-                    query_type=query_type.value
-                )
+                # Send query directly to Codex (no parsing!)
+                technical_output = await self.technical_agent.analyze_query(user_input)
 
                 # Translate to business language
                 brief, detailed = await self.translator_agent.translate(
                     technical_output=technical_output,
-                    component_name=component_name
+                    component_name=""  # No component name needed anymore
                 )
 
                 # Cache the results
                 if self.cache:
                     self.cache.set(
-                        component=component_name,
-                        query_type=query_type.value,
+                        query=user_input,
                         brief_output=brief,
                         detailed_output=detailed
                     )
@@ -143,19 +128,17 @@ Commands:
                 return
 
         # Display result
-        self._display_result(component_name, query_type, brief, detailed)
+        self._display_result(user_input, brief, detailed)
 
         # Store for "more" command
-        self.session_state.last_component = component_name
-        self.session_state.last_query_type = query_type.value
+        self.session_state.last_query = user_input
         self.session_state.last_detailed = detailed
 
-    def _display_result(self, component_name: str, query_type: QueryType, brief: str, detailed: str):
+    def _display_result(self, query: str, brief: str, detailed: str):
         """Display query result with progressive disclosure"""
         # Header
         console.print("━" * console.width)
-        console.print(f"[bold]Component:[/bold] {component_name}")
-        console.print(f"[bold]Query Type:[/bold] {get_query_description(query_type.value)}")
+        console.print(f"[bold]Query:[/bold] {query}")
         console.print("━" * console.width)
 
         # Brief summary
@@ -165,9 +148,7 @@ Commands:
         # Prompt for more details
         console.print("\n" + "━" * console.width)
         console.print("[dim]💡 Want more details?[/dim]")
-        console.print("[dim]   Type 'more' to see full explanation, or try:[/dim]")
-        console.print(f"[dim]   - What are the restrictions for {component_name}?[/dim]")
-        console.print(f"[dim]   - What does {component_name} depend on?[/dim]")
+        console.print("[dim]   Type 'more' to see full explanation[/dim]")
         console.print("━" * console.width)
         console.print()
 
@@ -186,8 +167,7 @@ Commands:
         if self.cache:
             stats = self.cache.get_stats()
             cache_info = f"""Cache enabled: Yes
-Cached entries: {stats['total_entries']}
-Cached components: {stats['total_components']}
+Cached queries: {stats['total_entries']}
 Auto-invalidate: {'Enabled' if self.config.cache_auto_invalidate else 'Disabled'}
 TTL: {self.config.cache_ttl_days} days"""
         else:
@@ -200,8 +180,8 @@ Current commit: {self.current_commit}
 [bold]Cache Status[/bold]
 {cache_info}
 
-[bold]Agent Models[/bold]
-Technical Agent: {self.config.technical_agent_model}
+[bold]Agent Configuration[/bold]
+Technical Agent: OpenAI Codex CLI (JSON mode)
 Translator Agent: {self.config.translator_agent_model}
 """
         console.print(Panel(status_text, title="System Status", border_style="blue"))
