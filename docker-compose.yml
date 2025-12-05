@@ -13,7 +13,7 @@ services:
       - .env.docker
 
     volumes:
-      - ${HOST_REPO_PATH}:/workspace/repo:ro
+      - ${HOST_REPO_PATH}:/workspace/repo
     command: python -m src.main
     restart: "no"
     network_mode: bridge
