@@ -16,7 +16,6 @@ And get answers in clear, business-focused language without technical jargon.
 
 - **Natural Language Queries**: Ask questions in plain English
 - **Progressive Disclosure**: Brief summaries with optional detailed explanations
-- **Smart Caching**: Auto-invalidates when repository changes (via `git pull`)
 - **Full Repository Search**: Analyzes entire codebase for comprehensive results
 - **4 Query Types**:
   - Usage examples and integration steps
@@ -26,12 +25,63 @@ And get answers in clear, business-focused language without technical jargon.
 
 ## Prerequisites
 
-- Python 3.10 or higher
-- Node.js 18+ (for future Codex CLI integration)
+- **For Docker deployment**: Docker and Docker Compose
+- **For local development**: Python 3.10 or higher
 - Git
 - OpenAI API key with GPT-4o access
 
 ## Installation
+
+Choose either **Docker** (recommended for easy deployment) or **Local** setup:
+
+---
+
+## Docker Installation (Recommended)
+
+### 1. Configure Environment
+
+```bash
+# Copy the Docker environment template
+cp environment.docker.template .env.docker
+
+# Edit with your OpenAI API key
+nano .env.docker
+```
+
+**Required settings in `.env.docker`:**
+```bash
+# Your OpenAI API key (used for both Codex CLI and GPT translation)
+OPENAI_API_KEY=sk-proj-your-key-here
+
+# Container repository path (leave as-is)
+REPO_PATH=/workspace/repo
+```
+
+### 2. Set Repository Path
+
+```bash
+# Set the path to your Git repository on the host machine
+export HOST_REPO_PATH=/path/to/your/repository
+```
+
+### 3. Run with Docker Compose
+
+```bash
+# Build and start the container
+export HOST_REPO_PATH=./fms && docker-compose run --rm pm-query-system
+
+# The system will start automatically - no need to run 'codex login'!
+```
+
+**Benefits of Docker setup:**
+- ✅ No need to run `codex login` - API key authentication is automatic
+- ✅ Isolated environment with all dependencies pre-installed
+- ✅ Consistent runtime across different machines
+- ✅ Single OPENAI_API_KEY for both Codex and GPT translation
+
+---
+
+## Local Installation
 
 ### 1. Clone and Setup
 
@@ -55,9 +105,9 @@ cp env.template .env
 nano .env
 ```
 
-Required settings in `.env`:
+**Required settings in `.env`:**
 ```bash
-# Your OpenAI API key
+# Your OpenAI API key (used for both Codex CLI and GPT translation)
 OPENAI_API_KEY=sk-proj-...
 
 # Path to the Git repository you want to analyze
@@ -66,11 +116,7 @@ REPO_PATH=/path/to/your/component-library
 
 Optional settings:
 ```bash
-CACHE_DIR=/Users/sean/work/cbAgent/.cache
-CACHE_ENABLED=true
-CACHE_TTL_DAYS=7
-CACHE_AUTO_INVALIDATE=true
-TECHNICAL_AGENT_MODEL=gpt-5-nano
+CODEX_LOGS_DIR=/Users/sean/.cbagent/codex_logs  # Raw Codex output logs
 TRANSLATOR_AGENT_MODEL=gpt-5-nano
 LOG_LEVEL=INFO
 ```
@@ -143,56 +189,58 @@ Goodbye!
 
 - **Query**: Just type your question naturally
 - **more**: Show detailed explanation for the last query
-- **status**: Show cache and repository status
-- **cache clear**: Clear all cached results
+- **status**: Show repository status
 - **help**: Show help message
 - **exit** or **quit**: Exit the program
 
 ## How It Works
 
-1. **Query Parsing**: Detects query type and extracts component name
-2. **Cache Check**: Looks for existing cached analysis
-3. **Technical Analysis**: Uses OpenAI to analyze the codebase
-4. **Business Translation**: Converts technical output to PM-friendly language
-5. **Progressive Disclosure**: Shows brief summary first, detailed on request
-6. **Auto-Invalidation**: Cache automatically clears when repository changes
+1. **Direct Query**: User query sent directly to Codex (no regex parsing)
+2. **Technical Analysis**: Codex CLI analyzes the entire codebase
+3. **Business Translation**: Converts technical output to PM-friendly language
+4. **Progressive Disclosure**: Shows brief summary first, detailed on request
 
 ## Architecture
 
 ```
-PM Query → Parser → Cache → Technical Agent (OpenAI GPT-4o)
-                          → Translator Agent (OpenAI GPT-4o)
-                          → Brief + Detailed Output
+PM Query → Codex CLI (Direct Analysis)
+        → Translator Agent (OpenAI GPT-4o)
+        → Brief + Detailed Output
 ```
 
 ### Key Components
 
 - `src/main.py`: Interactive CLI and main application
 - `src/config.py`: Configuration management
-- `src/cache.py`: Persistent cache with Git tracking
-- `src/agents/technical_agent.py`: Code analysis using OpenAI
+- `src/agents/technical_agent.py`: Codex CLI integration (direct query passing)
 - `src/agents/translator_agent.py`: Business translation
-- `src/queries/parser.py`: Natural language query parsing
-- `src/queries/templates.py`: Query templates for each type
+- `src/mcp/codex_server.py`: Codex MCP server connection
 
 ## Configuration Options
 
-### Cache Settings
-
-- `CACHE_ENABLED`: Enable/disable caching (default: true)
-- `CACHE_TTL_DAYS`: Days before cache expires (default: 7)
-- `CACHE_AUTO_INVALIDATE`: Auto-clear cache on git changes (default: true)
-
 ### Agent Settings
 
-- `TECHNICAL_AGENT_MODEL`: Model for code analysis (default: gpt-5-nano)
 - `TRANSLATOR_AGENT_MODEL`: Model for translation (default: gpt-5-nano)
+- Technical analysis now uses Codex CLI directly (no model configuration needed)
+- `CODEX_LOGS_DIR`: Directory where raw Codex JSON outputs are saved (default: ~/.cbagent/codex_logs)
 
-### Repository Updates
+### Raw Output Logging
 
-After running `git pull` in your repository:
-- If `CACHE_AUTO_INVALIDATE=true`: Cache automatically invalidates
-- If `CACHE_AUTO_INVALIDATE=false`: Run `cache clear` manually
+All raw JSON outputs from Codex CLI are automatically saved to timestamped log files in the `CODEX_LOGS_DIR` directory. This is useful for:
+- Debugging Codex parsing issues
+- Analyzing the raw data structure
+- Auditing Codex responses
+
+Log files are named: `codex_output_YYYYMMDD_HHMMSS_microseconds.json`
+
+Each log file contains:
+```json
+{
+  "timestamp": "2025-12-03T10:30:45.123456",
+  "stdout": "Raw stdout from Codex CLI...",
+  "stderr": "Any error output..."
+}
+```
 
 ## Troubleshooting
 
@@ -206,15 +254,6 @@ After running `git pull` in your repository:
   OPENAI_API_KEY=sk-proj-your-key-here
   ```
 
-### Cache not invalidating after git pull
-- Check `CACHE_AUTO_INVALIDATE=true` in `.env`
-- Or manually run: `cache clear`
-
-### Slow queries
-- First query for a component takes longer (no cache)
-- Subsequent queries are much faster (cached)
-- Cache persists across sessions
-
 ## Development
 
 ### Project Structure
@@ -227,7 +266,6 @@ After running `git pull` in your repository:
 ├── src/
 │   ├── main.py            # Entry point
 │   ├── config.py          # Settings
-│   ├── cache.py           # Cache layer
 │   ├── agents/            # AI agents
 │   ├── mcp/               # Codex integration (future)
 │   ├── queries/           # Query handling
@@ -244,7 +282,7 @@ pytest tests/
 
 ## Roadmap
 
-- [ ] Integrate with Codex CLI MCP server for better code analysis
+- [x] Integrate with Codex CLI MCP server for better code analysis
 - [ ] Add support for multiple repositories
 - [ ] Export results to Markdown/PDF
 - [ ] Component dependency graphs

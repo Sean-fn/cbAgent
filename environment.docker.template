@@ -1,0 +1,61 @@
+# Docker Environment Configuration Template
+# Copy this file to .env.docker and fill in your actual values
+# Usage: cp environment.docker.template .env.docker
+
+# ============================================================================
+# REQUIRED CONFIGURATION
+# ============================================================================
+
+# OpenAI API Key (shared by both OpenAI API and Codex CLI)
+# Get your key from: https://platform.openai.com/api-keys
+# This single key is used for:
+#   - GPT translation (translator agent)
+#   - Codex CLI authentication (no need for 'codex login')
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Repository path (container path, should match docker-compose.yml volume mount)
+REPO_PATH=/workspace/repo
+
+# ============================================================================
+# OPTIONAL CONFIGURATION
+# ============================================================================
+
+# Codex CLI Configuration
+# Codex CLI timeout in seconds (default: 600 = 10 minutes)
+CODEX_TIMEOUT=600
+
+# Directory for raw Codex JSON output logs (for debugging)
+CODEX_LOGS_DIR=/app/codex_logs
+
+# Translation model to use (default: gpt-5-nano)
+TRANSLATOR_AGENT_MODEL=gpt-5-nano
+
+# Logging level (default: INFO)
+# Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL=INFO
+
+# Log file path (optional, logs to stdout by default)
+# LOG_FILE=/app/logs/pm_query.log
+
+# Maximum retry attempts for API calls (default: 3)
+MAX_RETRIES=3
+
+# ============================================================================
+# USAGE NOTES
+# ============================================================================
+#
+# 1. Copy this template:
+#    cp environment.docker.template .env.docker
+#
+# 2. Edit .env.docker with your actual OpenAI API key:
+#    nano .env.docker
+#
+# 3. Set HOST_REPO_PATH before running:
+#    export HOST_REPO_PATH=/path/to/your/repo
+#
+# 4. Run with docker-compose:
+#    docker-compose up
+#
+# NOTE: No need to run 'codex login' - API key authentication is automatic!
+#
+# ============================================================================

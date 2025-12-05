@@ -5,3 +5,5 @@ fms/
 .cache/
 .env
 __pycache__/
+logs/
+.env.docker

@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  pm-query-system:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pm-query-system:latest
+    container_name: pm-query
+
+    # Critical for interactive CLI (prompt_toolkit)
+    stdin_open: true
+    tty: true
+
+    # Load environment variables from file
+    env_file:
+      - .env.docker
+
+    volumes:
+      # Repository (read-only to prevent accidental modifications)
+      - ${HOST_REPO_PATH}:/workspace/repo:ro
+
+      # Logs (optional, for debugging)
+      - ./codex_logs:/app/codex_logs
+
+    # Default command
+    command: python -m src.main
+
+    # Don't restart automatically
+    restart: "no"
+
+    # Network mode
+    network_mode: bridge
