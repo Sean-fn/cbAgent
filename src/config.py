@@ -15,12 +15,6 @@ class Settings(BaseSettings):
     openai_api_key: str
     repo_path: Path
 
-    # Cache configuration
-    cache_dir: Path = Path.home() / ".cbagent" / "cache"
-    cache_enabled: bool = True
-    cache_ttl_days: int = 7
-    cache_auto_invalidate: bool = True
-
     # Codex configuration
     codex_timeout: int = 600  # Increased to 10 minutes for complex queries
     codex_logs_dir: Path = Path.cwd() / "codex_logs"
@@ -38,7 +32,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False
+        case_sensitive=False,
+        extra="ignore"
     )
 
     def validate_repo_path(self) -> None:

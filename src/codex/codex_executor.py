@@ -32,8 +32,10 @@ class CodexParseError(CodexExecutorError):
 
 
 # Response Model
+# NOTE: This class is currently unused but kept for backward compatibility
+# The executor now returns plain strings directly from .msg.message
 class CodexResponse:
-    """Structured response from Codex CLI"""
+    """Structured response from Codex CLI (DEPRECATED - not currently used)"""
 
     def __init__(
         self,
@@ -126,118 +128,53 @@ class CodexExecutor:
         if not self.repo_path.exists():
             raise ValueError(f"Repository path does not exist: {self.repo_path}")
 
-    async def execute_query(self, prompt: str) -> CodexResponse:
+    async def execute_query(self, prompt: str) -> str:
         """
-        Execute Codex CLI with query and return structured response
+        Execute Codex CLI with query and return plain text response
 
         Args:
             prompt: The analysis query/task for Codex
 
         Returns:
-            CodexResponse object with structured analysis
+            Plain text message from Codex (extracted from .msg.message)
 
         Raises:
             CodexTimeoutError: If query exceeds timeout
             CodexAuthError: If authentication fails
+            CodexParseError: If .msg.message field not found
             CodexExecutorError: For other execution errors
         """
-        # Build the complete task prompt
-        task = self._build_task_prompt(prompt)
+        # Run Codex CLI and get plain text message
+        return await self._run_codex_cli(prompt)
 
-        # Run Codex CLI and get JSON response
-        result_json = await self._run_codex_cli(task)
 
-        # Parse and return structured response
-        return CodexResponse.from_json(result_json)
 
-    def _build_task_prompt(self, user_query: str) -> str:
+    async def _run_codex_cli(self, task: str) -> str:
         """
-        Build the complete task prompt for Codex CLI
-
-        This wraps the user's query with instructions for structured output
-        """
-        return f"""{user_query}
-
-Please provide your response in a structured format that includes:
-1. A comprehensive technical analysis
-2. List of files you analyzed
-3. Key findings as bullet points
-4. Relevant code examples with proper context
-
-Focus on being thorough and accurate."""
-
-    def _get_output_schema(self) -> dict:
-        """
-        Get the JSON schema for Codex output
-
-        This schema ensures consistent, parseable output from Codex
-        """
-        return {
-            "type": "object",
-            "properties": {
-                "analysis": {
-                    "type": "string",
-                    "description": "Main technical analysis text explaining the findings"
-                },
-                "files_analyzed": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of file paths that were analyzed"
-                },
-                "key_findings": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Bullet points of key findings and insights"
-                },
-                "code_examples": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Relevant code snippets with context"
-                },
-                "metadata": {
-                    "type": "object",
-                    "properties": {
-                        "confidence": {
-                            "type": "number",
-                            "description": "Confidence level (0-1)"
-                        },
-                        "files_count": {
-                            "type": "integer",
-                            "description": "Number of files analyzed"
-                        }
-                    }
-                }
-            },
-            "required": ["analysis", "files_analyzed", "key_findings", "code_examples"],
-            "additionalProperties": False
-        }
-
-    async def _run_codex_cli(self, task: str) -> dict:
-        """
-        Run codex exec command and capture stdout/stderr
+        Run codex_script.sh with the task/question as argument and capture the returned value
 
         Args:
             task: The task/prompt for Codex
 
         Returns:
-            Parsed JSON response from Codex
+            Plain text message from the script (already extracted .msg.message by jq)
 
         Raises:
             CodexTimeoutError: If execution times out
             CodexAuthError: If authentication fails
             CodexExecutorError: For other execution errors
         """
-        # Prepare the command
-        # Note: We'll use inline JSON schema via stdin or temp file
-        schema_json = json.dumps(self._get_output_schema())
+        # Get the path to the script
+        script_path = Path(__file__).parent / "codex_script.sh"
 
+        if not script_path.exists():
+            raise CodexExecutorError(f"Script not found: {script_path}")
+
+        # Prepare the command - call the bash script with the task as argument
         cmd = [
-            "codex",
-            "exec",
-            task,
-            "--json",
-            # Note: If --output-schema doesn't support inline JSON, we may need to write to a temp file
-            # For now, we'll try without it and rely on --json flag
+            "bash",
+            str(script_path),
+            task
         ]
 
         try:
@@ -264,108 +201,19 @@ Focus on being thorough and accurate."""
                     "Try a more specific query or increase CODEX_TIMEOUT."
                 )
 
-            # Check return code
-            # if process.returncode != 0:
-                # error_msg = stderr.decode() if stderr else "Unknown error"
+            # Get the output from the script
+            output_text = stdout.decode().strip().replace("null\n", "")
+            error_text = stderr.decode().strip() if stderr else ""
 
-                # # Check for authentication errors
-                # if "authentication" in error_msg.lower() or "login" in error_msg.lower():
-                #     raise CodexAuthError(
-                #         f"Codex CLI authentication failed. Please run 'codex login' first.\n"
-                #         f"Error: {error_msg}"
-                #     )
-
-                # # Generic error
-                # raise CodexExecutorError(
-                #     f"Codex CLI execution failed (exit code {process.returncode}):\n{error_msg}"
-                # )
-
-            # Parse JSON output
-            try:
-                output_text = stdout.decode().strip()
-
-                # Save raw output to log file
-                # Handle case where Codex might output multiple JSON objects (JSON Lines)
-                # We'll try to parse the last complete JSON object
-                lines = output_text.strip().split('\n')
-
-                # Try to find a valid JSON object from the end
-                for line in reversed(lines):
-                    line = line.strip()
-                    if line and (line.startswith('{') or line.startswith('[')):
-                        try:
-                            result = json.loads(line)
-                            # If this is a JSON Lines stream with type field, extract the data
-                            if isinstance(result, dict) and 'type' in result:
-                                # This might be a stream event, look for agent_message or final output
-                                if result.get('type') == 'item.completed' and 'item' in result:
-                                    item = result['item']
-                                    if item.get('type') == 'agent_message' and 'text' in item:
-                                        # Save raw output only for agent_message
-                                        self._save_raw_output(item['text'], stderr.decode() if stderr else "")
-                                        # The text field might be the final message, not JSON
-                                        # In this case, we need to construct our own response
-                                        return self._construct_fallback_response(item['text'])
-                            else:
-                                # Check if this looks like our expected schema
-                                if 'analysis' in result or 'files_analyzed' in result:
-                                    return result
-                        except json.JSONDecodeError:
-                            continue
-
-                # If we couldn't find a structured response, try parsing the whole output
-                result = json.loads(output_text)
-                return result
-
-            except json.JSONDecodeError as e:
-                # If JSON parsing fails, create a fallback response from raw text
-                return self._construct_fallback_response(output_text)
+            # The script already extracts .msg.message using jq, so just return the output
+            return output_text
 
         except FileNotFoundError:
             raise CodexExecutorError(
-                "Codex CLI not found. Please install it first.\n"
-                "Visit: https://openai.com/blog/codex-cli for installation instructions."
+                "Bash or script not found. Please ensure bash is available and the script exists at: "
+                f"{script_path}"
             )
         except Exception as e:
             if isinstance(e, (CodexTimeoutError, CodexAuthError, CodexExecutorError)):
                 raise
-            raise CodexExecutorError(f"Unexpected error running Codex CLI: {str(e)}")
-
-    def _construct_fallback_response(self, text: str) -> dict:
-        """
-        Construct a fallback response when JSON parsing fails
-
-        This creates a basic response structure from plain text output
-        """
-        return {
-            "analysis": text,
-            "files_analyzed": [],
-            "key_findings": [],
-            "code_examples": [],
-            "metadata": {
-                "confidence": 0.5,
-                "files_count": 0
-            }
-        }
-
-    def _save_raw_output(self, stdout: str, stderr: str) -> None:
-        """
-        Save raw Codex output to a timestamped log file
-
-        Args:
-            stdout: Raw stdout from Codex CLI
-            stderr: Raw stderr from Codex CLI
-        """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        log_file = self.logs_dir / f"codex_output_{timestamp}.json"
-
-        log_data = {
-            "timestamp": datetime.now().isoformat(),
-            "stdout": stdout,
-            "stderr": stderr
-        }
-
-        with open(log_file, 'w', encoding='utf-8') as f:
-            json.dump(log_data, f, indent=2, ensure_ascii=False)
-
-        print(f"Raw Codex output saved to: {log_file}")
+            raise CodexExecutorError(f"Unexpected error running Codex script: {str(e)}")

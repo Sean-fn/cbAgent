@@ -16,7 +16,6 @@ from prompt_toolkit.history import InMemoryHistory
 from dotenv import load_dotenv
 
 from src.config import get_config
-from src.cache import CacheManager, CacheEntry
 from src.agents.technical_agent import TechnicalAgent
 from src.agents.translator_agent import TranslatorAgent
 from git import Repo
@@ -31,6 +30,7 @@ class SessionState:
     def __init__(self):
         self.last_query: Optional[str] = None
         self.last_detailed: Optional[str] = None
+        self.last_technical: Optional[str] = None
 
 
 class PMQuerySystem:
@@ -42,13 +42,6 @@ class PMQuerySystem:
         self.config = get_config()
 
         # Initialize components
-        self.cache = CacheManager(
-            cache_dir=self.config.cache_dir,
-            repo_path=self.config.repo_path,
-            ttl_days=self.config.cache_ttl_days,
-            auto_invalidate=self.config.cache_auto_invalidate
-        ) if self.config.cache_enabled else None
-
         self.technical_agent = TechnicalAgent(
             api_key=None,  # Codex CLI uses session auth via 'codex login'
             model=None,    # Codex CLI determines model automatically
@@ -81,8 +74,8 @@ Type your question about any component, or try:
 
 Commands:
   • [bold]more[/bold] - Show detailed explanation for last query
-  • [bold]status[/bold] - Show cache and repository status
-  • [bold]cache clear[/bold] - Clear all cached results
+  • [bold]raw[/bold] - Show raw technical output from TechnicalAgent
+  • [bold]status[/bold] - Show repository status
   • [bold]help[/bold] - Show this help message
   • [bold]exit[/bold] or [bold]quit[/bold] - Exit the program
 """
@@ -92,47 +85,29 @@ Commands:
         """Process a user query by sending it directly to Codex"""
         console.print(f"\n[dim]Analyzing your query...[/dim]")
 
-        # Check cache
-        cached_entry: Optional[CacheEntry] = None
-        if self.cache:
-            cached_entry = self.cache.get(user_input)
+        try:
+            # Send query directly to Codex (no parsing!)
+            technical_output = await self.technical_agent.analyze_query(user_input)
 
-        if cached_entry:
-            brief = cached_entry.brief_output
-            detailed = cached_entry.detailed_output
-            console.print("[dim]✓ (cached result)[/dim]\n")
-        else:
-            # Perform analysis
-            try:
-                # Send query directly to Codex (no parsing!)
-                technical_output = await self.technical_agent.analyze_query(user_input)
+            # Translate to business language
+            brief, detailed = await self.translator_agent.translate(
+                technical_output=technical_output,
+                user_input=user_input
+            )
 
-                # Translate to business language
-                brief, detailed = await self.translator_agent.translate(
-                    technical_output=technical_output,
-                    component_name=""  # No component name needed anymore
-                )
+            console.print("[dim]✓[/dim]\n")
 
-                # Cache the results
-                if self.cache:
-                    self.cache.set(
-                        query=user_input,
-                        brief_output=brief,
-                        detailed_output=detailed
-                    )
-
-                console.print("[dim]✓[/dim]\n")
-
-            except Exception as e:
-                console.print(f"[red]❌ Error: {str(e)}[/red]")
-                return
+        except Exception as e:
+            console.print(f"[red]❌ Error: {str(e)}[/red]")
+            return
 
         # Display result
         self._display_result(user_input, brief, detailed)
 
-        # Store for "more" command
+        # Store for "more" and "raw" commands
         self.session_state.last_query = user_input
         self.session_state.last_detailed = detailed
+        self.session_state.last_technical = technical_output
 
     def _display_result(self, query: str, brief: str, detailed: str):
         """Display query result with progressive disclosure"""
@@ -162,38 +137,27 @@ Commands:
         console.print(self.session_state.last_detailed)
         console.print("\n" + "━" * console.width + "\n")
 
+    def show_raw(self):
+        """Show raw technical output from TechnicalAgent"""
+        if not self.session_state.last_technical:
+            console.print("[yellow]No previous query to show raw output for.[/yellow]")
+            return
+
+        console.print("\n[bold cyan]🔧 Raw Technical Output[/bold cyan]\n")
+        console.print(self.session_state.last_technical)
+        console.print("\n" + "━" * console.width + "\n")
+
     def show_status(self):
         """Show system status"""
-        if self.cache:
-            stats = self.cache.get_stats()
-            cache_info = f"""Cache enabled: Yes
-Cached queries: {stats['total_entries']}
-Auto-invalidate: {'Enabled' if self.config.cache_auto_invalidate else 'Disabled'}
-TTL: {self.config.cache_ttl_days} days"""
-        else:
-            cache_info = "Cache disabled"
-
         status_text = f"""[bold]Repository Status[/bold]
 Path: {self.config.repo_path}
 Current commit: {self.current_commit}
-
-[bold]Cache Status[/bold]
-{cache_info}
 
 [bold]Agent Configuration[/bold]
 Technical Agent: OpenAI Codex CLI (JSON mode)
 Translator Agent: {self.config.translator_agent_model}
 """
         console.print(Panel(status_text, title="System Status", border_style="blue"))
-
-    def clear_cache(self):
-        """Clear cache"""
-        if not self.cache:
-            console.print("[yellow]Cache is disabled.[/yellow]")
-            return
-
-        count = self.cache.clear()
-        console.print(f"[green]✓ Cleared {count} cached entries.[/green]")
 
     async def run(self):
         """Main interactive loop"""
@@ -223,11 +187,11 @@ Translator Agent: {self.config.translator_agent_model}
                 elif user_input.lower() == "more":
                     self.show_more()
 
+                elif user_input.lower() == "raw":
+                    self.show_raw()
+
                 elif user_input.lower() == "status":
                     self.show_status()
-
-                elif user_input.lower().startswith("cache clear"):
-                    self.clear_cache()
 
                 elif user_input.lower() in ["help", "?"]:
                     self.show_welcome()
