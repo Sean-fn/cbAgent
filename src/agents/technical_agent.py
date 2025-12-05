@@ -18,7 +18,7 @@ class TechnicalAgent:
     - Returns raw technical analysis from Codex
     """
 
-    def __init__(self, api_key: str = None, model: str = None, repo_path: Path = None, logs_dir: Optional[Path] = None):
+    def __init__(self, api_key: str = None, model: str = None, repo_path: Path = None):
         """
         Initialize the TechnicalAgent with Codex CLI executor
 
@@ -26,10 +26,9 @@ class TechnicalAgent:
             api_key: Deprecated - Codex CLI uses session-based auth via 'codex login'
             model: Deprecated - Codex CLI determines model automatically
             repo_path: Path to the repository to analyze
-            logs_dir: Directory to save raw Codex outputs (optional)
         """
         self.repo_path = repo_path
-        self.codex = CodexExecutor(repo_path=repo_path, timeout=600, logs_dir=logs_dir)
+        self.codex = CodexExecutor(repo_path=repo_path, timeout=600)
 
     async def analyze_query(self, user_query: str) -> str:
         """

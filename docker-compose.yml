@@ -20,9 +20,6 @@ services:
       # Repository (read-only to prevent accidental modifications)
       - ${HOST_REPO_PATH}:/workspace/repo:ro
 
-      # Logs (optional, for debugging)
-      - ./codex_logs:/app/codex_logs
-
     # Default command
     command: python -m src.main
 

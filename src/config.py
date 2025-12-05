@@ -17,7 +17,6 @@ class Settings(BaseSettings):
 
     # Codex configuration
     codex_timeout: int = 600  # Increased to 10 minutes for complex queries
-    codex_logs_dir: Path = Path.cwd() / "codex_logs"
 
     # Agent configuration
     translator_agent_model: str = "gpt-5-nano"

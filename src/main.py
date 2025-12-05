@@ -45,8 +45,7 @@ class PMQuerySystem:
         self.technical_agent = TechnicalAgent(
             api_key=None,  # Codex CLI uses session auth via 'codex login'
             model=None,    # Codex CLI determines model automatically
-            repo_path=self.config.repo_path,
-            logs_dir=self.config.codex_logs_dir
+            repo_path=self.config.repo_path
         )
 
         self.translator_agent = TranslatorAgent(
@@ -89,25 +88,46 @@ Commands:
             # Send query directly to Codex (no parsing!)
             technical_output = await self.technical_agent.analyze_query(user_input)
 
-            # Translate to business language
-            brief, detailed = await self.translator_agent.translate(
-                technical_output=technical_output,
-                user_input=user_input
-            )
+            # Translate to business language (parallel execution)
+            brief_task = self.translator_agent._generate_brief(technical_output, user_input)
+            detailed_task = self.translator_agent._generate_detailed(technical_output, user_input)
 
+            # Wait for brief first and display immediately
+            brief = await brief_task
             console.print("[dim]✓[/dim]\n")
+
+            # Display brief immediately
+            self._display_brief(user_input, brief)
+
+            # Wait for detailed in background
+            detailed = await detailed_task
 
         except Exception as e:
             console.print(f"[red]❌ Error: {str(e)}[/red]")
             return
 
-        # Display result
-        self._display_result(user_input, brief, detailed)
-
         # Store for "more" and "raw" commands
         self.session_state.last_query = user_input
         self.session_state.last_detailed = detailed
         self.session_state.last_technical = technical_output
+
+    def _display_brief(self, query: str, brief: str):
+        """Display just the brief summary"""
+        # Header
+        console.print("━" * console.width)
+        console.print(f"[bold]Query:[/bold] {query}")
+        console.print("━" * console.width)
+
+        # Brief summary
+        console.print("\n[bold cyan]📄 Quick Summary[/bold cyan]\n")
+        console.print(brief)
+
+        # Prompt for more details
+        console.print("\n" + "━" * console.width)
+        console.print("[dim]💡 Want more details?[/dim]")
+        console.print("[dim]   Type 'more' to see full explanation[/dim]")
+        console.print("━" * console.width)
+        console.print()
 
     def _display_result(self, query: str, brief: str, detailed: str):
         """Display query result with progressive disclosure"""

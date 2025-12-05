@@ -64,10 +64,6 @@ else
     echo "✓ Valid Git repository detected"
 fi
 
-# Check 5: Create logs directory if needed
-mkdir -p "$CODEX_LOGS_DIR"
-echo "✓ Logs directory ready: $CODEX_LOGS_DIR"
-
 # All checks passed
 echo ""
 echo "✅ Environment validated successfully!"

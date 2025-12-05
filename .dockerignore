@@ -34,7 +34,6 @@ env/
 
 # Logs and outputs
 logs/
-codex_logs/
 *.log
 *.json
 

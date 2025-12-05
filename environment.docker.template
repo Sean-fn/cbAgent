@@ -24,9 +24,6 @@ REPO_PATH=/workspace/repo
 # Codex CLI timeout in seconds (default: 600 = 10 minutes)
 CODEX_TIMEOUT=600
 
-# Directory for raw Codex JSON output logs (for debugging)
-CODEX_LOGS_DIR=/app/codex_logs
-
 # Translation model to use (default: gpt-5-nano)
 TRANSLATOR_AGENT_MODEL=gpt-5-nano
 

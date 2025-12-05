@@ -50,7 +50,7 @@ COPY --from=builder /root/.local /home/appuser/.local
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser \
-    && mkdir -p /home/appuser/.codex /app/codex_logs \
+    && mkdir -p /home/appuser/.codex /app \
     && chown -R appuser:appuser /home/appuser /app
 
 # Set working directory
@@ -68,13 +68,12 @@ USER appuser
 
 # Configure environment
 ENV PATH="/home/appuser/.local/bin:$PATH" \
-    PYTHONPATH="/app:$PYTHONPATH" \
+    PYTHONPATH="/app" \
     PYTHONUNBUFFERED=1 \
-    REPO_PATH=/workspace/repo \
-    CODEX_LOGS_DIR=/app/codex_logs
+    REPO_PATH=/workspace/repo
 
 # Define volumes
-VOLUME ["/workspace/repo", "/app/codex_logs"]
+VOLUME ["/workspace/repo"]
 
 # Set entrypoint and default command
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

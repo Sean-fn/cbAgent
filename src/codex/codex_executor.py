@@ -107,23 +107,18 @@ class CodexExecutor:
     Uses `codex exec` with JSON output for structured responses
     """
 
-    def __init__(self, repo_path: Path, timeout: int = 600, logs_dir: Optional[Path] = None):
+    def __init__(self, repo_path: Path, timeout: int = 600):
         """
         Initialize CodexExecutor
 
         Args:
             repo_path: Path to the Git repository to analyze
             timeout: Timeout in seconds (default: 600 = 10 minutes)
-            logs_dir: Directory to save raw Codex outputs (optional)
 
         Note: Authentication is handled by Codex CLI via 'codex login'
         """
         self.repo_path = Path(repo_path)
         self.timeout = timeout
-        self.logs_dir = logs_dir or Path.home() / ".cbagent" / "codex_logs"
-
-        # Create logs directory if it doesn't exist
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.repo_path.exists():
             raise ValueError(f"Repository path does not exist: {self.repo_path}")
