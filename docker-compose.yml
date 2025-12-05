@@ -1,12 +1,12 @@
 version: '3.8'
 
 services:
-  pm-query-system:
+  cb-agent-system:
     build:
       context: .
       dockerfile: Dockerfile
-    image: pm-query-system:latest
-    container_name: pm-query
+    image: docker.io/seanfn/cb-agent-system:latest
+    container_name: cb-agent
 
     # Critical for interactive CLI (prompt_toolkit)
     stdin_open: true

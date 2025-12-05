@@ -51,7 +51,7 @@ MAX_RETRIES=3
 #    export HOST_REPO_PATH=/path/to/your/repo
 #
 # 4. Run with docker-compose:
-#    docker-compose up
+#    docker-compose run --rm cb-agent-system
 #
 # NOTE: No need to run 'codex login' - API key authentication is automatic!
 #
