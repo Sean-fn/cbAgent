@@ -27,13 +27,6 @@ CODEX_TIMEOUT=600
 # Translation model to use (default: gpt-5-nano)
 TRANSLATOR_AGENT_MODEL=gpt-5-nano
 
-# Logging level (default: INFO)
-# Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
-LOG_LEVEL=INFO
-
-# Log file path (optional, logs to stdout by default)
-# LOG_FILE=/app/logs/pm_query.log
-
 # Maximum retry attempts for API calls (default: 3)
 MAX_RETRIES=3
 

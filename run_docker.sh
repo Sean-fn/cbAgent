@@ -23,4 +23,5 @@ else
 fi
 
 
-docker-compose run --rm cb-agent-system
+# docker-compose run --rm cb-agent-system
+docker run -it --rm --env-file .env.docker -v $HOST_REPO_PATH:/workspace/repo --name cb-agent docker.io/seanfn/cb-agent-system:latest python -m src.main

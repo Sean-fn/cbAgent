@@ -13,17 +13,13 @@ class Settings(BaseSettings):
 
     # Required settings
     openai_api_key: str
-    repo_path: Path
+    repo_path: Path = Path("/workspace/repo")
 
     # Codex configuration
     codex_timeout: int = 600  # Increased to 10 minutes for complex queries
 
     # Agent configuration
     translator_agent_model: str = "gpt-5-nano"
-
-    # Logging
-    log_level: str = "INFO"
-    log_file: Optional[Path] = None
 
     # Session configuration
     max_retries: int = 3
