@@ -30,50 +30,34 @@ Choose either **Docker** or **Local** setup:
 ### 0. Prepare Your Repository
 
 The system needs a Git repository to analyze:
-
+Put all your target code repositories in a folder, e.g., `./repos`.
 ```bash
-# Clone your component library (example)
-git clone https://github.com/your-org/component-library.git /path/to/repo
+git clone <repository_url> ./repos/your-repo-name
 ```
-
+**Example structure:**
+```
+repos/
+├── fms/
+│   └── .git/
+├── scv-rocket/
+│   └── .git/
+└── poc-ai/
+    └── .git/
+```
 
 ### 1. Configure Environment
 
 ```bash
-# Copy the Docker environment template
-cp environment.docker.template .env.docker
-
-# Edit with your OpenAI API key
-vim .env.docker
+# OpenAI API Key (shared by both OpenAI API and Codex CLI)
+echo "OPENAI_API_KEY=sk-proj-your-key-here" > .env.docker
 ```
 
-**Required settings in `.env.docker`:**
-```bash
-# Your OpenAI API key (used for both Codex CLI and GPT translation)
-OPENAI_API_KEY=sk-proj-your-key-here
-```
-
-### 2. Set Repository Path
+### 3. Run with Docker using the script
 
 ```bash
-# Set the path to your Git repository on the host machine
-export HOST_REPO_PATH=/path/to/your/repository
+# execute the script with the repo folder
+./run_docker.sh <repos_folder>
 ```
-
-### 3. Run with Docker Compose
-
-```bash
-# Build and start the container
-export HOST_REPO_PATH=./fms && docker-compose run --rm cb-agent-system
-
-# The system will start automatically - no need to run 'codex login'!
-```
-
-**Benefits of Docker setup:**
-- ✅ No need to run `codex login` - API key authentication is automatic
-- ✅ Isolated environment with all dependencies pre-installed
-- ✅ Consistent runtime across different machines
-- ✅ Single OPENAI_API_KEY for both Codex and GPT translation
 
 ---
 
@@ -110,7 +94,6 @@ OPENAI_API_KEY=sk-proj-...
 Optional settings:
 ```bash
 TRANSLATOR_AGENT_MODEL=gpt-5-nano
-LOG_LEVEL=INFO
 ```
 ### 3. Start the Interactive CLI
 
@@ -123,7 +106,7 @@ python -m src.main
 
 ### Agent Settings
 
-- `TRANSLATOR_AGENT_MODEL`: Model for translation (default: gpt-5-vim)
+- `TRANSLATOR_AGENT_MODEL`: Model for translation (default: gpt-5-nano)
 - Technical analysis now uses Codex CLI directly (no model configuration needed)
 
 ## Troubleshooting
