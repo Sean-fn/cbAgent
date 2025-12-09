@@ -52,10 +52,14 @@ repos/
 echo "OPENAI_API_KEY=sk-proj-your-key-here" > .env.docker
 ```
 
-### 3. Run with Docker using the script
+### 2. Run with Docker using the script
 
 ```bash
-# execute the script with the repo folder
+# Download from S3 and make executable
+curl -O https://gofreight.sean-fn.com/run_docker.sh
+chmod +x run_docker.sh
+
+# Then run the script
 ./run_docker.sh <repos_folder>
 ```
 
