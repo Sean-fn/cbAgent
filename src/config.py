@@ -36,16 +36,28 @@ class Settings(BaseSettings):
     )
 
     def validate_repo_path(self) -> None:
-        """Validate that the repository path exists and is a git repository"""
+        """Validate that the repository path exists and is either a git repository or contains git repositories"""
         if not self.repo_path.exists():
             raise ValueError(f"Repository path does not exist: {self.repo_path}")
 
         if not self.repo_path.is_dir():
             raise ValueError(f"Repository path is not a directory: {self.repo_path}")
 
+        # Check if the path itself is a git repository
         git_dir = self.repo_path / ".git"
-        if not git_dir.exists():
-            raise ValueError(f"Repository path is not a git repository: {self.repo_path}")
+        if git_dir.exists():
+            return  # Valid: path is a git repository
+
+        has_git_repos = any(
+            (item / ".git").exists()
+            for item in self.repo_path.iterdir()
+            if item.is_dir()
+        )
+
+        if not has_git_repos:
+            raise ValueError(
+                f"Repository path is not a git repository and contains no git repositories: {self.repo_path}"
+            )
 
 
 # Global config instance

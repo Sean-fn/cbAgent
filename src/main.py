@@ -55,15 +55,22 @@ class PMQuerySystem:
 
         self.session_state = SessionState()
 
-        # Get repository info
-        self.repo = Repo(self.config.repo_path)
-        self.current_commit = self.repo.head.commit.hexsha[:7]
+        # Get repository info (handle both single repos and directories with multiple repos)
+        self.repo = None
+        self.current_commit = None
+        try:
+            self.repo = Repo(self.config.repo_path)
+            self.current_commit = self.repo.head.commit.hexsha[:7]
+        except Exception:
+            # Not a single git repo - might be a directory containing multiple repos
+            pass
 
     def show_welcome(self):
         """Display welcome banner"""
+        status_line = f"Status: Up to date (commit: {self.current_commit})" if self.current_commit else "Status: Multiple repositories"
         welcome_text = f"""[bold cyan]PM Component Query System[/bold cyan]
 Repository: {self.config.repo_path}
-Status: Up to date (commit: {self.current_commit})
+{status_line}
 
 Type your question about any component, or try:
   • How do I use the PaymentButton?
@@ -169,9 +176,10 @@ Commands:
 
     def show_status(self):
         """Show system status"""
+        commit_info = f"Current commit: {self.current_commit}" if self.current_commit else "Multiple repositories"
         status_text = f"""[bold]Repository Status[/bold]
 Path: {self.config.repo_path}
-Current commit: {self.current_commit}
+{commit_info}
 
 [bold]Agent Configuration[/bold]
 Technical Agent: OpenAI Codex CLI (JSON mode)
