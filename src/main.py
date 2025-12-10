@@ -94,6 +94,8 @@ Commands:
         try:
             # Send query directly to Codex (no parsing!)
             technical_output = await self.technical_agent.analyze_query(user_input)
+            console.print("[dim]✓ Agentic workflow complete[/dim]")
+            console.print("[dim]Generating final answer...[/dim]")
 
             # Translate to business language (parallel execution)
             brief_task = self.translator_agent._generate_brief(technical_output, user_input)
@@ -101,7 +103,7 @@ Commands:
 
             # Wait for brief first and display immediately
             brief = await brief_task
-            console.print("[dim]✓[/dim]\n")
+            console.print("[dim]✓ Result generated[/dim]\n")
 
             # Display brief immediately
             self._display_brief(user_input, brief)
