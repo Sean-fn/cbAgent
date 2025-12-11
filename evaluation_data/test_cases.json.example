@@ -1,0 +1,41 @@
+{
+  "test_cases": [
+    {
+      "id": "001",
+      "question": "How does the PaymentButton component work?",
+      "ground_truth": {
+        "key_ideas": [
+          "Handles payment submission",
+          "Validates card information before processing",
+          "Shows loading state during payment",
+          "Displays success or error messages",
+          "Integrates with payment processing system"
+        ]
+      }
+    },
+    {
+      "id": "002",
+      "question": "What are the business rules for UserProfile?",
+      "ground_truth": {
+        "key_ideas": [
+          "Requires authentication to access",
+          "Allows editing personal information",
+          "Validates email format",
+          "Updates are saved automatically"
+        ]
+      }
+    },
+    {
+      "id": "003",
+      "question": "What does LoginForm depend on?",
+      "ground_truth": {
+        "key_ideas": [
+          "Depends on authentication service",
+          "Requires form validation library",
+          "Connects to user session management",
+          "Uses secure password handling"
+        ]
+      }
+    }
+  ]
+}

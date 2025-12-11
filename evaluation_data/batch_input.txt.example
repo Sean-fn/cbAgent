@@ -1,0 +1,8 @@
+Q: How does the PaymentButton component work?
+A: The PaymentButton is a crucial component in the checkout process. It handles the entire payment submission workflow, including validating card information before processing, showing loading states during the payment transaction, and displaying appropriate success or error messages to users. The component integrates seamlessly with the payment processing system and ensures secure handling of sensitive payment data.
+
+Q: What are the business rules for UserProfile?
+A: The UserProfile component requires users to be authenticated before accessing any profile information. It allows users to edit their personal information like name, email, and phone number. The component includes validation to ensure email addresses are in the correct format. All updates are saved automatically to the database, and users receive immediate feedback when changes are successful.
+
+Q: What does the LoginForm depend on?
+A: The LoginForm component has several key dependencies. It relies on the authentication service to verify user credentials and establish secure sessions. The form uses a validation library to ensure all inputs meet requirements before submission. It connects to the user session management system to maintain login state across the application. Security is a priority, so it uses secure password handling with proper encryption.
