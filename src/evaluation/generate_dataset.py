@@ -117,6 +117,26 @@ Extract the key ideas from this answer in the specified JSON format."""
         console.print(f"\n[green]✓ Dataset saved to {output_path}[/green]")
         console.print(f"[dim]Total test cases: {len(self.test_cases)}[/dim]")
 
+    def load_existing_dataset(self, input_path: Path) -> int:
+        """
+        Load existing dataset and return the next test case number
+
+        Args:
+            input_path: Path to existing JSON file
+
+        Returns:
+            Next test case number (last ID + 1)
+        """
+        with open(input_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        self.test_cases = data.get("test_cases", [])
+
+        if self.test_cases:
+            last_id = max(int(tc["id"]) for tc in self.test_cases)
+            return last_id + 1
+        return 1
+
     def display_test_case(self, test_case: dict):
         """Display a test case in formatted panel"""
         content = f"""[bold cyan]ID:[/bold cyan] {test_case['id']}
@@ -153,13 +173,38 @@ async def interactive_mode():
 
     generator = DatasetGenerator(api_key=api_key)
 
+    # Check for existing dataset
+    output_path = Path("evaluation_data/test_cases.json")
+    test_counter = 1
+    is_continuing = False
+
+    if output_path.exists():
+        console.print(f"\n[yellow]Found existing dataset: {output_path}[/yellow]")
+
+        with open(output_path, 'r', encoding='utf-8') as f:
+            existing_data = json.load(f)
+        existing_count = len(existing_data.get("test_cases", []))
+        console.print(f"[dim]Current test cases: {existing_count}[/dim]")
+
+        choice = Prompt.ask(
+            "\n[cyan]Start fresh or continue from existing?[/cyan]",
+            choices=["new", "continue"],
+            default="continue"
+        )
+
+        if choice == "continue":
+            test_counter = generator.load_existing_dataset(output_path)
+            is_continuing = True
+            console.print(f"\n[green]✓ Loaded {existing_count} existing test cases[/green]")
+            console.print(f"[dim]Next test case ID: {test_counter:03d}[/dim]")
+        else:
+            console.print("\n[yellow]Starting fresh (existing file will be overwritten on save)[/yellow]")
+
     console.print("\n[bold]Instructions:[/bold]")
     console.print("1. Enter a question")
     console.print("2. Paste the ground truth answer (the ideal answer)")
     console.print("3. Review and edit the extracted key ideas")
     console.print("4. Repeat to add more test cases\n")
-
-    test_counter = 1
 
     while True:
         console.print(f"\n[bold cyan]━━━ Test Case #{test_counter} ━━━[/bold cyan]\n")
@@ -241,11 +286,13 @@ async def interactive_mode():
     if generator.test_cases:
         console.print("\n[bold]Saving dataset...[/bold]")
 
-        output_path = Path("evaluation_data/test_cases.json")
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Check if file exists
-        if output_path.exists():
+        # If continuing from existing file, save directly (data already merged)
+        # If starting fresh, ask for confirmation before overwriting
+        if is_continuing:
+            generator.save_dataset(output_path)
+        elif output_path.exists():
             if Confirm.ask(f"\n{output_path} already exists. Overwrite?", default=False):
                 generator.save_dataset(output_path)
             else:

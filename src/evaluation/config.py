@@ -19,7 +19,7 @@ class EvaluationSettings(BaseSettings):
     results_output_dir: Path = Path("evaluation_results")
 
     # Execution settings
-    max_concurrent_evaluations: int = 1  # Run 3 tests in parallel
+    max_concurrent_evaluations: int = 3  # Run 3 tests in parallel
     evaluation_timeout: int = 900  # 15 minutes per test
 
     model_config = SettingsConfigDict(
